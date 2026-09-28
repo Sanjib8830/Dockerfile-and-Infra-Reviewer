@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dockerfile &amp; Infra Reviewer | Architecture</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --muted: #5f6b76;
+      --paper: #f7f4ee;
+      --panel: #fffdf8;
+      --line: #d9d3c8;
+      --teal: #087f8c;
+      --teal-soft: #dff3f2;
+      --orange: #c35b28;
+      --orange-soft: #fae5d8;
+      --navy: #17324d;
+      --navy-soft: #e3edf5;
+      --green: #2c7650;
+      --green-soft: #e4f1e8;
+      --shadow: 0 18px 45px rgba(23, 32, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.6;
+    }
+    a { color: var(--teal); }
+    code, pre, .eyebrow, .tag, .meta, .nav, .step-number {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+    .page { max-width: 1240px; margin: 0 auto; padding: 0 28px 72px; }
+    .hero {
+      min-height: 420px;
+      display: grid;
+      align-content: center;
+      padding: 72px 0 58px;
+      position: relative;
+      border-bottom: 1px solid var(--line);
+    }
+    .hero:after {
+      content: "";
+      position: absolute;
+      right: 3%;
+      top: 60px;
+      width: 180px;
+      height: 180px;
+      border: 18px solid var(--orange);
+      opacity: 0.16;
+      transform: rotate(18deg);
+    }
+    .eyebrow { color: var(--orange); text-transform: uppercase; letter-spacing: 0.13em; font-size: 0.78rem; font-weight: 700; }
+    h1, h2, h3 { line-height: 1.12; margin: 0; }
+    h1 { max-width: 840px; font-size: clamp(2.9rem, 7vw, 6.2rem); letter-spacing: -0.045em; margin: 14px 0 22px; }
+    h2 { font-size: clamp(2rem, 4vw, 3.3rem); letter-spacing: -0.025em; margin-bottom: 18px; }
+    h3 { font-size: 1.3rem; margin-bottom: 10px; }
+    p { max-width: 760px; }
+    .lede { color: var(--muted); font-size: 1.25rem; max-width: 720px; }
+    .meta { color: var(--muted); font-size: 0.78rem; margin-top: 28px; }
+    .nav-wrap { position: sticky; top: 0; z-index: 5; background: rgba(247, 244, 238, 0.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(10px); }
+    .nav { max-width: 1240px; margin: 0 auto; padding: 14px 28px; display: flex; gap: 22px; overflow-x: auto; white-space: nowrap; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    .nav a { text-decoration: none; color: var(--navy); font-weight: 700; }
+    section { padding: 76px 0 0; }
+    .section-intro { display: grid; grid-template-columns: minmax(190px, 0.8fr) 2fr; gap: 40px; align-items: start; margin-bottom: 30px; }
+    .section-label { color: var(--orange); font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, 1fr); }
+    .card { background: var(--panel); border: 1px solid var(--line); padding: 24px; box-shadow: var(--shadow); }
+    .card p { color: var(--muted); margin: 8px 0 0; }
+    .card.teal { border-top: 5px solid var(--teal); }
+    .card.orange { border-top: 5px solid var(--orange); }
+    .card.navy { border-top: 5px solid var(--navy); }
+    .card.green { border-top: 5px solid var(--green); }
+    .tag { display: inline-block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 7px; margin-bottom: 14px; background: var(--teal-soft); color: var(--teal); }
+    .tag.orange { background: var(--orange-soft); color: var(--orange); }
+    .tag.navy { background: var(--navy-soft); color: var(--navy); }
+    .tag.green { background: var(--green-soft); color: var(--green); }
+    .diagram { background: var(--navy); color: #f5f3ec; padding: 28px; overflow-x: auto; box-shadow: var(--shadow); }
+    .diagram .flow { display: flex; align-items: stretch; gap: 12px; min-width: 900px; }
+    .node { flex: 1; min-width: 140px; border: 1px solid rgba(255,255,255,0.28); padding: 16px; background: rgba(255,255,255,0.08); }
+    .node strong { display: block; color: #fff; margin-bottom: 7px; }
+    .node span { color: #c9d7df; font-size: 0.86rem; }
+    .arrow { align-self: center; color: #f4a477; font-size: 1.5rem; }
+    .flow-note { color: #c9d7df; margin: 22px 0 0; font-size: 0.9rem; }
+    .sequence { display: grid; gap: 10px; }
+    .step { display: grid; grid-template-columns: 50px 1fr; gap: 16px; align-items: start; padding: 15px 0; border-bottom: 1px solid var(--line); }
+    .step-number { color: var(--orange); font-weight: 700; font-size: 0.9rem; padding-top: 3px; }
+    .step p { margin: 4px 0 0; color: var(--muted); }
+    .tree { background: #18252c; color: #d9ebe5; padding: 24px; overflow: auto; font-size: 0.9rem; line-height: 1.75; }
+    .tree .folder { color: #f4a477; }
+    .tree .comment { color: #8aa8a2; }
+    .contract { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); }
+    th, td { padding: 13px 15px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { color: var(--navy); font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    td { color: var(--muted); }
+    td:first-child { color: var(--ink); font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.86rem; }
+    .callout { padding: 22px 25px; border-left: 5px solid var(--orange); background: var(--orange-soft); margin-top: 20px; }
+    .callout strong { color: var(--orange); }
+    ul { padding-left: 20px; color: var(--muted); }
+    li + li { margin-top: 8px; }
+    .footer { border-top: 1px solid var(--line); margin-top: 80px; padding-top: 24px; color: var(--muted); font-size: 0.88rem; }
+    @media (max-width: 800px) {
+      .page { padding: 0 18px 50px; }
+      .nav { padding-left: 18px; }
+      .hero { min-height: 390px; padding-top: 55px; }
+      .hero:after { width: 100px; height: 100px; border-width: 11px; top: 38px; }
+      .section-intro, .grid, .grid.two { grid-template-columns: 1fr; gap: 18px; }
+      .section-intro { margin-bottom: 22px; }
+      section { padding-top: 55px; }
+      .card { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="nav-wrap">
+    <nav class="nav" aria-label="Architecture sections">
+      <a href="#overview">Overview</a>
+      <a href="#hld">HLD</a>
+      <a href="#lld">LLD</a>
+      <a href="#flows">Flows</a>
+      <a href="#contracts">Contracts</a>
+      <a href="#operations">Operations</a>
+      <a href="#limits">Boundaries</a>
+    </nav>
+  </div>
+
+  <main class="page">
+    <header class="hero" id="overview">
+      <div class="eyebrow">Architecture note / MVP</div>
+      <h1>Dockerfile &amp; Infra Reviewer</h1>
+      <p class="lede">A static, evidence-first DevSecOps review system for Dockerfiles and Terraform configuration, with optional AI assistance for explanation and remediation.</p>
+      <div class="meta">Repository root &middot; FastAPI + React/TypeScript + deterministic rules + optional Google AI</div>
+    </header>
+
+    <section id="hld">
+      <div class="section-intro">
+        <div class="section-label">01 / High-level design</div>
+        <div>
+          <h2>Separate the product surface from the review engine.</h2>
+          <p>The system is intentionally stateless. The browser owns the editing experience, the API owns validation and orchestration, deterministic analyzers own the baseline truth, and the AI provider may enrich a result without becoming a prerequisite for review.</p>
+        </div>
+      </div>
+
+      <div class="diagram" aria-label="High-level architecture diagram">
+        <div class="flow">
+          <div class="node"><strong>Browser UI</strong><span>React page, Monaco editor, upload, tabs, export</span></div>
+          <div class="arrow">-&gt;</div>
+          <div class="node"><strong>FastAPI API</strong><span>Validation, routing, errors, health endpoint</span></div>
+          <div class="arrow">-&gt;</div>
+          <div class="node"><strong>ReviewService</strong><span>Selects reviewer and coordinates the pipeline</span></div>
+          <div class="arrow">-&gt;</div>
+          <div class="node"><strong>Rule Engine</strong><span>Dockerfile or Terraform static findings</span></div>
+          <div class="arrow">-&gt;</div>
+          <div class="node"><strong>Optional AI</strong><span>Redacted input, explanations, correction, diff</span></div>
+        </div>
+        <p class="flow-note">The response always preserves <code>original_content</code>. If AI is unavailable, deterministic findings still return successfully.</p>
+      </div>
+
+      <div class="grid" style="margin-top: 18px">
+        <article class="card teal"><span class="tag">Client</span><h3>Focused review workspace</h3><p>Users select a file type, edit or upload source, submit it, and inspect findings without leaving the page.</p></article>
+        <article class="card orange"><span class="tag orange">Analysis</span><h3>Evidence before opinion</h3><p>Rules produce normalized findings first. AI can explain or propose changes, but cannot replace the baseline analysis.</p></article>
+        <article class="card navy"><span class="tag navy">Safety</span><h3>Advisory by design</h3><p>The product never executes submitted infrastructure and never claims generated Terraform is safe to apply.</p></article>
+      </div>
+    </section>
+
+    <section id="lld">
+      <div class="section-intro">
+        <div class="section-label">02 / Low-level design</div>
+        <div>
+          <h2>Small modules, explicit contracts.</h2>
+          <p>The backend separates transport models from domain abstractions. The frontend mirrors the response contract with TypeScript types, keeping the API boundary visible on both sides.</p>
+        </div>
+      </div>
+
+      <div class="grid two">
+        <article class="card teal">
+          <span class="tag">Backend modules</span>
+          <h3>Request and orchestration path</h3>
+          <ul>
+            <li><code>app/main.py</code> creates the FastAPI application.</li>
+            <li><code>app/api/routes/review.py</code> exposes <code>/health</code> and <code>/review</code>.</li>
+            <li><code>app/schemas/review.py</code> validates requests and serializes responses.</li>
+            <li><code>app/services/review_service.py</code> implements <code>ReviewService</code> and coordinates analysis, AI, diff generation, and observability.</li>
+            <li><code>app/models/review.py</code> defines the <code>Reviewer</code> protocol and <code>AnalysisResult</code>.</li>
+          </ul>
+        </article>
+        <article class="card orange">
+          <span class="tag orange">Analyzer modules</span>
+          <h3>Type-specific rule composition</h3>
+          <ul>
+            <li><code>DockerfileReviewer</code> combines security, optimization, and reliability rules.</li>
+            <li><code>TerraformReviewer</code> combines security and quality rules.</li>
+            <li>Each rule returns a normalized <code>Finding</code> with an ID, category, severity, evidence, impact, and recommendation.</li>
+            <li>Terraform extraction uses lightweight brace counting, not a full HCL parser.</li>
+          </ul>
+        </article>
+        <article class="card navy">
+          <span class="tag navy">AI boundary</span>
+          <h3>Optional augmentation</h3>
+          <ul>
+            <li><code>ReviewAssistant</code> exits early when no API key or no findings exist.</li>
+            <li>Secrets are redacted before model input.</li>
+            <li>Returned JSON is validated for shape, risk values, and forbidden safety claims.</li>
+            <li>AI failure maps to <code>ai_status: unavailable</code>; it does not erase static findings.</li>
+          </ul>
+        </article>
+        <article class="card green">
+          <span class="tag green">Frontend modules</span>
+          <h3>Presentation and interaction</h3>
+          <ul>
+            <li><code>ReviewPage</code> owns type, content, selected finding, and result composition.</li>
+            <li><code>useReview</code> owns idle, loading, success, and error state.</li>
+            <li><code>reviewApi.ts</code> posts JSON and normalizes API errors.</li>
+            <li><code>ReviewResults</code>, <code>FindingsList</code>, and <code>DiffViewer</code> render the analysis.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="tree" style="margin-top: 18px" aria-label="Relevant source tree"><span class="folder">backend/</span>
+  <span class="folder">app/</span>
+    main.py                         <span class="comment"># application and router registration</span>
+    <span class="folder">api/routes/</span>
+      review.py                     <span class="comment"># HTTP boundary</span>
+    <span class="folder">services/</span>
+      review_service.py             <span class="comment"># pipeline orchestration</span>
+    <span class="folder">analyzers/</span>
+      dockerfile_reviewer.py        <span class="comment"># Docker rule composition</span>
+      terraform_reviewer.py         <span class="comment"># Terraform rule composition</span>
+    <span class="folder">rules/</span>                          <span class="comment"># deterministic checks</span>
+    <span class="folder">ai/</span>
+      review_assistant.py           <span class="comment"># optional model integration</span>
+    <span class="folder">schemas/</span>
+      review.py                     <span class="comment"># API/domain-facing data structures</span>
+  <span class="folder">frontend/src/</span>
+    pages/ReviewPage.tsx             <span class="comment"># review workspace</span>
+    hooks/useReview.ts               <span class="comment"># async state</span>
+    services/reviewApi.ts            <span class="comment"># API client</span>
+    components/                     <span class="comment"># editor, input, findings, diff</span></div>
+    </section>
+
+    <section id="flows">
+      <div class="section-intro">
+        <div class="section-label">03 / Runtime flows</div>
+        <div>
+          <h2>One pipeline, two supported input types.</h2>
+          <p>The type changes the reviewer and rules selected, but the surrounding lifecycle remains the same.</p>
+        </div>
+      </div>
+      <div class="grid two">
+        <article class="card">
+          <h3>Review request</h3>
+          <div class="sequence">
+            <div class="step"><div class="step-number">01</div><div><strong>Submit</strong><p>The browser sends <code>type</code>, <code>content</code>, and optional filename.</p></div></div>
+            <div class="step"><div class="step-number">02</div><div><strong>Validate</strong><p>The API rejects unsupported types, empty text, or content larger than 1 MB.</p></div></div>
+            <div class="step"><div class="step-number">03</div><div><strong>Analyze</strong><p>The selected deterministic reviewer runs its rule modules and calculates severity counts.</p></div></div>
+            <div class="step"><div class="step-number">04</div><div><strong>Augment</strong><p>Optional AI receives redacted content and structured findings.</p></div></div>
+            <div class="step"><div class="step-number">05</div><div><strong>Respond</strong><p>The API returns findings, original source, optional correction, diff, and AI status.</p></div></div>
+          </div>
+        </article>
+        <article class="card">
+          <h3>AI degradation path</h3>
+          <div class="sequence">
+            <div class="step"><div class="step-number">A</div><div><strong>Not requested</strong><p>No API key is configured, or the static reviewer found nothing to explain.</p></div></div>
+            <div class="step"><div class="step-number">B</div><div><strong>Available</strong><p>Validated explanations are merged by finding ID; a changed correction produces a unified diff.</p></div></div>
+            <div class="step"><div class="step-number">C</div><div><strong>Unavailable</strong><p>Timeouts, provider errors, malformed JSON, or unsafe claims become an unavailable status.</p></div></div>
+            <div class="step"><div class="step-number">D</div><div><strong>Always preserve evidence</strong><p>The deterministic findings and original content remain available in every successful review.</p></div></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="contracts">
+      <div class="section-intro">
+        <div class="section-label">04 / API and data</div>
+        <div>
+          <h2>The contract is the spine.</h2>
+          <p>The formal contract lives in <code>specs/001-dockerfile-infra-review/contracts/review-api.md</code>. These are the fields that connect the UI, service, analyzers, and optional AI response.</p>
+        </div>
+      </div>
+      <div class="contract">
+        <table>
+          <thead><tr><th>Object</th><th>Key fields</th><th>Responsibility</th></tr></thead>
+          <tbody>
+            <tr><td>ReviewRequest</td><td><code>type</code>, <code>content</code>, <code>filename?</code></td><td>Defines the supported input and enforces the non-empty, 1 MB-bound request.</td></tr>
+            <tr><td>Finding</td><td><code>id</code>, category, severity, title, evidence, impact, recommendation</td><td>Represents one deterministic, actionable issue. AI may add an explanation.</td></tr>
+            <tr><td>AnalysisResult</td><td>review type, findings, metrics</td><td>Domain result produced before AI augmentation. Summary counts are derived here.</td></tr>
+            <tr><td>ReviewResult</td><td>summary, findings, original, corrected, diff, AI status</td><td>Complete response consumed by the frontend and export actions.</td></tr>
+            <tr><td>RemediationChange</td><td>change, reason, related finding, risk, trade-offs</td><td>Explains each generated change. Terraform changes require a risk classification.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout"><strong>Important invariant:</strong> <code>original_content</code> is always the exact submitted source. Recommendations are separate fields and never silently overwrite user input.</div>
+    </section>
+
+    <section id="operations">
+      <div class="section-intro">
+        <div class="section-label">05 / Operations</div>
+        <div>
+          <h2>Simple to run, bounded by design.</h2>
+          <p>For local development, Vite serves the UI and proxies API calls to Uvicorn. There is no database or queue in the MVP.</p>
+        </div>
+      </div>
+      <div class="grid two">
+        <article class="card teal"><span class="tag">Local runtime</span><h3>Backend</h3><pre>GET /api/v1/health
+      POST /api/v1/review
+
+      cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload</pre><p>Health check: <code>GET /api/v1/health</code></p></article>
+        <article class="card orange"><span class="tag orange">Local runtime</span><h3>Frontend</h3><pre>cd frontend
+npm install
+npm run dev</pre><p>The Vite proxy forwards <code>/api</code> to <code>127.0.0.1:8000</code>.</p></article>
+        <article class="card navy"><span class="tag navy">Configuration</span><h3>Optional AI</h3><p>Set <code>GOOGLE_API_KEY</code> to enable AI. The model, timeout, and content limit can be configured through environment variables.</p></article>
+        <article class="card green"><span class="tag green">Verification</span><h3>Test surfaces</h3><p>Backend contract, integration, and unit tests cover rule behavior and failure modes. Frontend tests cover review experience, accessibility, Dockerfile, and Terraform flows.</p></article>
+      </div>
+    </section>
+
+    <section id="limits">
+      <div class="section-intro">
+        <div class="section-label">06 / Boundaries and next steps</div>
+        <div>
+          <h2>What this architecture does not pretend to be.</h2>
+          <p>These constraints are part of the design, not hidden implementation details.</p>
+        </div>
+      </div>
+      <div class="grid">
+        <article class="card"><h3>Static, not executable</h3><p>The system never runs <code>docker build</code>, <code>terraform apply</code>, provider initialization, or arbitrary submitted commands.</p></article>
+        <article class="card"><h3>Heuristic parsing</h3><p>Dockerfile checks are line-oriented and Terraform extraction is lightweight. Complex syntax can produce missed findings or false positives.</p></article>
+        <article class="card"><h3>MVP lifecycle</h3><p>Reviews are not persisted. Authentication, history, rate limiting, cancellation, and GitHub pull requests are outside the current boundary.</p></article>
+        <article class="card"><h3>External scanners</h3><p>Adapters exist for scanner-shaped output, but Hadolint, Trivy, TFLint, and Checkov are not invoked by default.</p></article>
+        <article class="card"><h3>AI is advisory</h3><p>Without a successful AI call, findings remain useful but corrected content and diffs may be absent.</p></article>
+        <article class="card"><h3>Production hardening</h3><p>Before production deployment, review dependency audit results, add operational controls, and consider parser and scanner integrations.</p></article>
+      </div>
+    </section>
+
+    <footer class="footer">Architecture document for the Dockerfile &amp; Infra Reviewer repository. Source of truth for implementation details remains the code and the feature contract under <code>specs/001-dockerfile-infra-review</code>.</footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,16 @@
+.git
+.github
+.specify
+.vscode
+node_modules
+frontend
+specs
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.coverage
+htmlcov
+*.log
+.env
+.env.*
+README.md
